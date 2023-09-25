@@ -1,0 +1,152 @@
+---
+title: "ZipcodeR Walkthrough"
+author: "Dave Drennan"
+date: "9/26/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r package setup}
+
+library(readr)
+library(ggplot2)
+library(tidycensus)
+library(tidyr)
+library(tidyverse)
+library(sf)
+
+```
+
+# Introduction
+
+ZIP codes are geographic areas tied to US addresses that can create challenges for spatial data analysis. While widely known due to their ubiquity for mailing and navigating and commonly included in data sets, ZIP codes do not necessarily connect with other boundaries such as cities, counties, and states because they were originally designed for efficiency in mail delivery. [Middle Tennessee State University](https://www.mtsu.edu/datascience/blog/post/71/what-should-every-data-scientist-know-when-working-with-zip-codes_) provides an overview of the history and challenges of ZIP codes, which includes:
+
+* changing ZIP codes to account for new construction;
+
+* boundaries crossing state lines;
+
+* ZIP codes representing individual buildings or even moving aircraft carriers; and
+
+* ZIP codes not existing at all for certain remote regions.
+
+`zipcodeR` was created by Gavin Rozzi to simplify working with ZIP codes in R. This package can provide a local data set on the user's computer of all ZIP codes in the US - this data set also includes 23 other variables, including geographic, demographic, and housing information. `zipcodeR`  features a list of functions for working with this information, with tools to:
+
+* identify ZIP codes in chosen geographies (cities, counties, states, specified radius);
+
+* geolocate and measure distance between ZIP codes for spatial analysis, and 
+
+* relate them to Census geographies like tracts and ZIP code tabulation areas (ZCTAs), which can differ from the postal ZIP codes.
+
+
+# Installation
+
+`zipcodeR` is available on CRAN and can be installed using `install.packages()` and `library()`. Once installed, `data("zip_code_db")` downloads `zipcodeR`'s data set with geographic, demographic, and housing information.
+
+```{r installing zipcodeR}
+#install.packages("zipcodeR")
+
+library(zipcodeR)
+
+data("zip_code_db")
+```
+# Basic Usage
+
+`zipcodeR` provides a variety of functions to identify ZIP codes and contextualize them. 
+
+## Identifying ZIP Codes
+A core feature of the package is the ability to search for ZIP codes and their associated information from the `zipcodeR` database in a specified geography. The search functions with primary arguments include:
+
+1. State: `search_state(state_abb)`
+
+2. County: `search_county(county_name, state_abb)`
+
+3. City: `search_city(city_name, state_abb)`
+
+4. FIPS Code: `search_fips(state_fips, county_fips)`
+
+5. Congressional District: `search_cd(state_fips_code, congressional_district)`
+
+6. Timezone: `search_tz(tz)` 
+    + e.g., "Eastern"
+
+7. Radius: `search_radius(lat, lng, radius = 1)`
+    + radius in miles, defaults to 1 mi
+
+The above functions 1 through 6 work similarly and require the user to know underlying names or codes for the geography of interest. The example below shows a call for ZIP codes in Philadelphia.
+
+```{r ZIP codes Philadelphia}
+
+phl_zip <- search_city("Philadelphia", "PA")
+
+head(phl_zip)
+
+```
+
+The `search_radius()` function requires specific latitude and longitude coordinates, but provides the ZIP codes and their distances in miles from the provided coordinates - the function does not include information from the `zipcodeR` database. The example below shows all ZIP codes within 2 miles of City Hall in Philadelphia, PA.
+
+```{r ZIP codes City Hall}
+
+cityHall_zip <- search_radius(39.95269006206156, -75.16381049538579, radius = 2)
+
+head(cityHall_zip)
+
+```
+
+## Tools for Known ZIP Codes
+
+If the user already knows a ZIP code that they would like to use, `zipcodeR` provides a series of tools to locate or measure distances, connect codes with US Census tracts, and other utility functions. The ZIP code functions with primary arguments include:
+
+8. Provides `zipcodeR` database columns for a ZIP code: `reverse_zipcode(zip_code)`
+
+9. Geolocate: `geocode_zip(zip_code)` 
+    + provides latitude and longitude coordinates of the ZIP code's centroid
+
+11. Distance between two ZIP codes: `zip_distance(zipcode_a, zipcode_b, lonlat = TRUE, units = "miles")`
+    + `lonlat` defaults to `TRUE` for spherical calculated distance - setting to `FALSE` provides planar calculated distances
+    + `units` choices are "miles" or "meters", defaults to miles
+
+12. Get congressional districts for a ZIP code: `get_cd(zip_code)`
+
+13. Get Census tracts for a ZIP code: `get_tracts(zip_code)`
+
+14. Returns true if ZIP code is a ZCTA: `is_zcta(zip_code)`
+
+15. Normalizes messy ZIP codes `normalize_zip(zipcode)`
+    + e.g. too many leading 0s
+    
+Function 8 allows the user to access the `zipcodeR` database in a convenient way for a known ZIP code. The example below shows the output for the Philadelphia ZIP code 19146 in the Grad Hospital neighborhood.
+
+```{r Grad Hospital}
+
+reverse_zipcode(19146)
+
+```
+Functions 9 and 10 allow for geographic data identification and calculations. The example below shows the distance between ZIP Code 19146 in Philadelphia and ZIP Code 19380 in West Chester, PA, with the `lonlat` and `units` arguments excluded to keep defaults - the output includes the specified ZIP codes and the distance in miles between the two.
+
+```{r distance}
+
+zip_distance(19146, 19380)
+
+```
+
+Functions 12 through 15 provide utility functions for connecting ZIP Codes to US Census geographies as well as cleaning ZIP code data. 
+
+Additionally, `zipcodeR` has data sets available to crosswalk ZCTAs to Census tracts for 2010 (`zcta_crosswalk`) and a relationship file to connect ZIP codes with congressional districts (`zip_to_cd`)
+
+# Example
+
+The following example uses data from [PropertyShark](https://www.propertyshark.com/Real-Estate-Reports/most-expensive-zip-codes-in-the-us/), which conducted a ranking of the 100 most expensive ZIP Codes in 2022.
+
+We will start by loading in the data and geolocating the centroids of each ZIP code using `geocode_zip()`. We will then use the `ggplot` package to map the ZIP codes.
+
+```{r example}
+
+data <- read.csv("Data/property_shark_data_2022.csv")
+
+is_zcta(data$Zip.Code)
+
+```
+
