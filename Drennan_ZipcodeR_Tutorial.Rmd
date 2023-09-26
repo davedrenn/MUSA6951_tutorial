@@ -19,6 +19,8 @@ library(tidyverse)
 library(sf)
 library(tigris)
 
+options(scipen = 999)
+
 ```
 
 # Introduction
@@ -141,29 +143,56 @@ Additionally, `zipcodeR` has data sets available to crosswalk ZCTAs to Census tr
 
 The following example uses data from [PropertyShark](https://www.propertyshark.com/Real-Estate-Reports/most-expensive-zip-codes-in-the-us/), which conducted a ranking of the 100 most expensive ZIP Codes in 2022.
 
-We will start by loading in the data and geolocating the centroids of each ZIP code using `geocode_zip()`. We will then use the `ggplot` package to map the ZIP codes.
+We will start by loading in the data and setting the column data types to characters in order to preserve leading zeros in ZIP codes - another challenge of the data type. 
 
-```{r example}
-
-ca_data <- read.csv("Data/property_shark_data_2022.csv")%>%
-  filter(State == "CA")
-
-ca_data <- reverse_zipcode(data$Zip.Code)
-
-ca_data <- st_as_sf(ca_data, coords = c("lng", "lat"), crs = 4326)
-
-states <- states(cb=TRUE)%>%
-  st_transform(states, crs = 4326) %>%
-  filter(NAME == "California")
-
-
-ggplot()+
-  geom_sf(data = states)+
-  geom_sf(data = ca_data)+
-  geom_point(size = "median_home_value)
-  
-
-
-
+```{r read example data}
+expensive_zips <- read.csv("Data/property_shark_data_2022.csv", colClasses = "character")
 ```
 
+After loading in the data, we will use `zipcodeR`'s `reverse_zipcode` function in a new data set to incorporate the package's built in database for our list of ZIP codes while still preserving PropertyShark's median home values for 2022 in a separate data set. We will then combine the original data with our data from `zipcodeR` and add a column that calculates the difference between the median sale price reported by the PropertyShark data and the median home value reported by the package database. We will also use the `sf` package to make the latitude and longitude from the package database into actual coordinate that we can map with the package `ggplot2`.
+
+```{r mutate data}
+expensive_zips_db <- reverse_zipcode(expensive_zips$Zip.Code)
+
+diff_market_db <- cbind(expensive_zips, expensive_zips_db)%>%
+  mutate(diff = as.numeric(Median.Sale.Price.2022) - median_home_value)
+
+diff_market_db <- st_as_sf(diff_market_db, coords = c("lng", "lat"), crs = 4326)
+```
+
+To better contextualize our data points of the most expensive ZIP codes, we will add a shapefile from the `tigris` package to create an underlying map of US States. We will filter our data to only include the 50 states and the District of Columbia, then manipulate the data to show the states in a more compact format for easier viewing. 
+
+```{r tigris states}
+states <- states(cb=TRUE)%>%
+  st_transform(states, crs = 4326)%>%
+  filter(STATEFP<60)
+
+states <- shift_geometry(states, preserve_area = FALSE, position = "below")
+```
+
+Finally, we will use `ggplot2` to map our market comparison data with the states shown underneath, creating a proportional symbol map for our ZIP codes where the size is based on the difference between the 2022 market value and the median sale value from `zipcodeR`. As shown in the following map, states in the southwestern quarter of the United States show a much larger difference between the market data and what the package data provides. This comparison highlights the volatility in the housing market during 2022.
+
+```{r map}
+ggplot()+
+  geom_sf(data = states)+
+  geom_sf(data = diff_market_db, aes(size = diff), color = "red")+
+  scale_size(range = c(1,5))
+```
+
+# Conclusion
+
+Through this vignette, we explored the capabilities of `zipcodeR`. While ZIP codes can have challenging limitations for spatial analysis, this package makes working with ZIP code data easier through two key areas: 
+
+* Searching for ZIP codes in a user-determined area through various geographies
+
+* Providing additional context for known ZIP codes through the package's built-in database and cross-walking ZIP codes with Census geographies, among other utility functions
+
+The example provided shows some limitations in the package's database compared to more realtime data, but `zipcodeR` is effective for exploratory analysis to understand ZIP code data and can work as a facilitating tool to connect a user's data to other geographies for further analysis.
+
+This tutorial covered the basic functionality of the package, but interested users are encouraged to explore the following guides provided by the developer of the package, Gavin Rozzi, for additional information on `zipcodeR`.
+
+1. [Package website](https://zipcoder.39n.io/articles/zipcodeR.html)
+
+2. [Journal publication about package](https://www.softwareimpacts.com/article/S2665-9638(21)00037-3/fulltext)
+
+3. [CRAN package documentation](https://cran.r-project.org/web/packages/zipcodeR/zipcodeR.pdf)
