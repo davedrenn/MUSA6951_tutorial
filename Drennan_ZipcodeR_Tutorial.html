@@ -356,13 +356,29 @@ display: none;
 </div>
 
 
+<pre class="r"><code>library(readr)
+library(ggplot2)
+library(tidycensus)
+library(tidyr)
+library(tidyverse)</code></pre>
+<pre><code>## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ✔ dplyr     1.1.2     ✔ purrr     1.0.2
+## ✔ forcats   1.0.0     ✔ stringr   1.5.0
+## ✔ lubridate 1.9.2     ✔ tibble    3.2.1
+## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()
+## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
+<pre class="r"><code>library(sf)</code></pre>
+<pre><code>## Linking to GEOS 3.11.2, GDAL 3.6.2, PROJ 9.2.0; sf_use_s2() is TRUE</code></pre>
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>ZIP codes are geographic areas tied to US addresses that can create
 challenges for spatial data analysis. While widely known due to their
 ubiquity for mailing and navigating and commonly included in data sets,
 ZIP codes do not necessarily connect with other boundaries such as
-cities, counties, and states. <a href="https://www.mtsu.edu/datascience/blog/post/71/what-should-every-data-scientist-know-when-working-with-zip-codes_">Middle
+cities, counties, and states because they were originally designed for
+efficiency in mail delivery. <a href="https://www.mtsu.edu/datascience/blog/post/71/what-should-every-data-scientist-know-when-working-with-zip-codes_">Middle
 Tennessee State University</a> provides an overview of the history and
 challenges of ZIP codes, which includes:</p>
 <ul>
@@ -485,6 +501,8 @@ head(cityHall_zip)</code></pre>
 distances, connect codes with US Census tracts, and other utility
 functions. The ZIP code functions with primary arguments include:</p>
 <ol start="8" style="list-style-type: decimal">
+<li><p>Provides <code>zipcodeR</code> database columns for a ZIP code:
+<code>reverse_zipcode(zip_code)</code></p></li>
 <li><p>Geolocate: <code>geocode_zip(zip_code)</code></p>
 <ul>
 <li>provides latitude and longitude coordinates of the ZIP code’s
@@ -493,9 +511,11 @@ centroid</li>
 <li><p>Distance between two ZIP codes:
 <code>zip_distance(zipcode_a, zipcode_b, lonlat = TRUE, units = &quot;miles&quot;)</code></p>
 <ul>
-<li><code>lonlat=TRUE</code> or <code>FALSE</code> provides spherical or
-planar calculated distances, respectively</li>
-<li>unit choices include “miles” or “meters”</li>
+<li><code>lonlat</code> defaults to <code>TRUE</code> for spherical
+calculated distance - setting to <code>FALSE</code> provides planar
+calculated distances</li>
+<li><code>units</code> choices are “miles” or “meters”, defaults to
+miles</li>
 </ul></li>
 <li><p>Get congressional districts for a ZIP code:
 <code>get_cd(zip_code)</code></p></li>
@@ -508,10 +528,62 @@ planar calculated distances, respectively</li>
 <ul>
 <li>e.g. too many leading 0s</li>
 </ul></li>
-<li><p>Provides <code>zipcodeR</code> database columns for a ZIP code:
-<code>reverse_zipcode(zip_code</code></p></li>
 </ol>
+<p>Function 8 allows the user to access the <code>zipcodeR</code>
+database in a convenient way for a known ZIP code. The example below
+shows the output for the Philadelphia ZIP code 19146 in the Grad
+Hospital neighborhood.</p>
+<pre class="r"><code>reverse_zipcode(19146)</code></pre>
+<pre><code>## # A tibble: 1 × 24
+##   zipcode zipcode_type major_city post_office_city common_city_list county state
+##   &lt;chr&gt;   &lt;chr&gt;        &lt;chr&gt;      &lt;chr&gt;                      &lt;blob&gt; &lt;chr&gt;  &lt;chr&gt;
+## 1 19146   Standard     Philadelp… Philadelphia, PA       &lt;raw 28 B&gt; Phila… PA   
+## # ℹ 17 more variables: lat &lt;dbl&gt;, lng &lt;dbl&gt;, timezone &lt;chr&gt;,
+## #   radius_in_miles &lt;dbl&gt;, area_code_list &lt;blob&gt;, population &lt;int&gt;,
+## #   population_density &lt;dbl&gt;, land_area_in_sqmi &lt;dbl&gt;,
+## #   water_area_in_sqmi &lt;dbl&gt;, housing_units &lt;int&gt;,
+## #   occupied_housing_units &lt;int&gt;, median_home_value &lt;int&gt;,
+## #   median_household_income &lt;int&gt;, bounds_west &lt;dbl&gt;, bounds_east &lt;dbl&gt;,
+## #   bounds_north &lt;dbl&gt;, bounds_south &lt;dbl&gt;</code></pre>
+<p>Functions 9 and 10 allow for geographic data identification and
+calculations. The example below shows the distance between ZIP Code
+19146 in Philadelphia and ZIP Code 19380 in West Chester, PA, with the
+<code>lonlat</code> and <code>units</code> arguments excluded to keep
+defaults - the output includes the specified ZIP codes and the distance
+in miles between the two.</p>
+<pre class="r"><code>zip_distance(19146, 19380)</code></pre>
+<pre><code>##   zipcode_a zipcode_b distance
+## 1     19146     19380    22.68</code></pre>
+<p>Functions 12 through 15 provide utility functions for connecting ZIP
+Codes to US Census geographies as well as cleaning ZIP code data.</p>
+<p>Additionally, <code>zipcodeR</code> has data sets available to
+crosswalk ZCTAs to Census tracts for 2010 (<code>zcta_crosswalk</code>)
+and a relationship file to connect ZIP codes with congressional
+districts (<code>zip_to_cd</code>)</p>
 </div>
+</div>
+<div id="example" class="section level1">
+<h1>Example</h1>
+<p>The following example uses data from <a href="https://www.propertyshark.com/Real-Estate-Reports/most-expensive-zip-codes-in-the-us/">PropertyShark</a>,
+which conducted a ranking of the 100 most expensive ZIP Codes in
+2022.</p>
+<p>We will start by loading in the data and geolocating the centroids of
+each ZIP code using <code>geocode_zip()</code>. We will then use the
+<code>ggplot</code> package to map the ZIP codes.</p>
+<pre class="r"><code>data &lt;- read.csv(&quot;Data/property_shark_data_2022.csv&quot;)
+
+is_zcta(data$Zip.Code)</code></pre>
+<pre><code>##   [1]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [13]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [25]  TRUE  TRUE  TRUE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [37]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE FALSE  TRUE  TRUE
+##  [49]  TRUE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [61]  TRUE  TRUE FALSE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [73]  TRUE  TRUE FALSE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+##  [85]  TRUE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE FALSE
+##  [97]  TRUE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+## [109]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE FALSE  TRUE
+## [121]  TRUE  TRUE FALSE  TRUE  TRUE  TRUE FALSE  TRUE</code></pre>
 </div>
 
 

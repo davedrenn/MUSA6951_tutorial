@@ -17,6 +17,7 @@ library(tidycensus)
 library(tidyr)
 library(tidyverse)
 library(sf)
+library(tigris)
 
 ```
 
@@ -144,9 +145,25 @@ We will start by loading in the data and geolocating the centroids of each ZIP c
 
 ```{r example}
 
-data <- read.csv("Data/property_shark_data_2022.csv")
+ca_data <- read.csv("Data/property_shark_data_2022.csv")%>%
+  filter(State == "CA")
 
-is_zcta(data$Zip.Code)
+ca_data <- reverse_zipcode(data$Zip.Code)
+
+ca_data <- st_as_sf(ca_data, coords = c("lng", "lat"), crs = 4326)
+
+states <- states(cb=TRUE)%>%
+  st_transform(states, crs = 4326) %>%
+  filter(NAME == "California")
+
+
+ggplot()+
+  geom_sf(data = states)+
+  geom_sf(data = ca_data)+
+  geom_point(size = "median_home_value)
+  
+
+
 
 ```
 
